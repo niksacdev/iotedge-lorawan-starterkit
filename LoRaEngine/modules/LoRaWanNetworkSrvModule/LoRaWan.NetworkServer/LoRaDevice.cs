@@ -76,6 +76,11 @@ namespace LoRaWan.NetworkServer
             }
         }
 
+        public LoRaDeviceClass DeviceClass
+        {
+            get => this.deviceClass;
+        }
+
         readonly object fcntLock;
         readonly Queue<LoRaRequest> queuedRequests;
         volatile bool hasFrameCountChanges;
@@ -84,6 +89,7 @@ namespace LoRaWan.NetworkServer
         volatile int fcntDown;
         volatile LoRaRequest runningRequest;
         private ILoRaDataRequestHandler dataRequestHandler;
+        LoRaDeviceClass deviceClass;
 
         /// <summary>
         ///  Gets or sets a value indicating whether cloud to device messages are enabled for the device
@@ -103,6 +109,7 @@ namespace LoRaWan.NetworkServer
             this.fcntLock = new object();
             this.confirmationResubmitCount = 0;
             this.queuedRequests = new Queue<LoRaRequest>();
+            this.deviceClass = LoRaDeviceClass.A;
         }
 
         /// <summary>
@@ -194,6 +201,14 @@ namespace LoRaWan.NetworkServer
                     var preferredWindowTwinValue = this.GetTwinPropertyIntValue(twin.Properties.Desired[TwinProperty.PreferredWindow].Value);
                     if (preferredWindowTwinValue == Constants.RECEIVE_WINDOW_2)
                         this.PreferredWindow = preferredWindowTwinValue;
+                }
+
+                if (twin.Properties.Desired.Contains(TwinProperty.DeviceClass))
+                {
+                    if (string.Equals("c", (string)twin.Properties.Desired[TwinProperty.DeviceClass], StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        this.deviceClass = LoRaDeviceClass.C;
+                    }
                 }
 
                 return true;

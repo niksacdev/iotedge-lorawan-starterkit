@@ -51,7 +51,7 @@ namespace LoRaWan.NetworkServer
         public uint Size { get; set; }
 
         [JsonProperty("data")]
-        public object Data { get; set; }
+        public ILoRaDeviceTelemetryPayload Data { get; set; }
 
         [JsonProperty("port")]
         public byte Port { get; set; }
@@ -78,7 +78,7 @@ namespace LoRaWan.NetworkServer
         {
         }
 
-        public LoRaDeviceTelemetry(Rxpk rxpk, LoRaPayloadData loRaPayloadData, object payloadData)
+        public LoRaDeviceTelemetry(Rxpk rxpk, LoRaPayloadData loRaPayloadData, ILoRaDeviceTelemetryPayload payloadData)
         {
             if (rxpk.ExtraData != null)
                 this.ExtraData = new Dictionary<string, object>(rxpk.ExtraData);

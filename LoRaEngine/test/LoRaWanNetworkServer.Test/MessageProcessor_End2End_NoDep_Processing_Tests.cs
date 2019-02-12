@@ -187,9 +187,9 @@ namespace LoRaWan.NetworkServer.Test
             Assert.Null(request.ResponseDownlink);
 
             Assert.NotNull(loRaDeviceTelemetry);
-            Assert.IsType<string>(loRaDeviceTelemetry.Data);
+            Assert.IsType<RawPayload>(loRaDeviceTelemetry.Data);
             var expectedPayloadContent = Convert.ToBase64String(Encoding.UTF8.GetBytes(msgPayload));
-            Assert.Equal(expectedPayloadContent, loRaDeviceTelemetry.Data);
+            Assert.Equal(expectedPayloadContent, loRaDeviceTelemetry.Data.ToString());
 
             this.LoRaDeviceClient.VerifyAll();
             this.LoRaDeviceApi.VerifyAll();
@@ -248,9 +248,9 @@ namespace LoRaWan.NetworkServer.Test
             if (netIdMatches)
             {
                 Assert.NotNull(loRaDeviceTelemetry);
-                Assert.IsType<string>(loRaDeviceTelemetry.Data);
+                Assert.IsType<RawPayload>(loRaDeviceTelemetry.Data);
                 var expectedPayloadContent = Convert.ToBase64String(Encoding.UTF8.GetBytes(msgPayload));
-                Assert.Equal(expectedPayloadContent, loRaDeviceTelemetry.Data);
+                Assert.Equal(expectedPayloadContent, loRaDeviceTelemetry.Data.ToString());
             }
             else
             {
@@ -307,9 +307,9 @@ namespace LoRaWan.NetworkServer.Test
             Assert.Null(request.ResponseDownlink);
 
             Assert.NotNull(loRaDeviceTelemetry);
-            Assert.IsType<JObject>(loRaDeviceTelemetry.Data);
-            var telemetryData = (JObject)loRaDeviceTelemetry.Data;
-            Assert.Equal(msgPayload, telemetryData["value"].ToString());
+            Assert.IsType<DecodedPayload>(loRaDeviceTelemetry.Data);
+            var telemetryData = (DecodedPayload)loRaDeviceTelemetry.Data;
+            Assert.Equal(msgPayload, telemetryData.Value.ToString());
 
             this.LoRaDeviceApi.VerifyAll();
             this.LoRaDeviceClient.VerifyAll();
@@ -488,8 +488,8 @@ namespace LoRaWan.NetworkServer.Test
                 .Callback<LoRaDeviceTelemetry, Dictionary<string, string>>((t, _) =>
                 {
                     Assert.NotNull(t.Data);
-                    Assert.IsType<JObject>(t.Data);
-                    Assert.Equal("3", ((JObject)t.Data)["value"].ToString());
+                    Assert.IsType<DecodedPayload>(t.Data);
+                    Assert.Equal("3", ((DecodedPayload)t.Data).Value.ToString());
                 })
                 .ReturnsAsync(true);
 
@@ -682,7 +682,7 @@ namespace LoRaWan.NetworkServer.Test
                 .Callback<LoRaDeviceTelemetry, Dictionary<string, string>>((t, d) =>
                  {
                      Assert.Equal(2, t.Fcnt);
-                     Assert.Equal("2", ((JObject)t.Data)["value"].ToString());
+                     Assert.Equal("2", ((DecodedPayload)t.Data).Value.ToString());
                  })
                  .ReturnsAsync(true);
 
@@ -808,9 +808,9 @@ namespace LoRaWan.NetworkServer.Test
             Assert.Null(requestWithCorrectMic.ResponseDownlink);
 
             Assert.NotNull(loRaDeviceTelemetry);
-            Assert.IsType<JObject>(loRaDeviceTelemetry.Data);
-            var telemetryData = (JObject)loRaDeviceTelemetry.Data;
-            Assert.Equal("456", telemetryData["value"].ToString());
+            Assert.IsType<DecodedPayload>(loRaDeviceTelemetry.Data);
+            var telemetryData = (DecodedPayload)loRaDeviceTelemetry.Data;
+            Assert.Equal("456", telemetryData.Value.ToString());
 
             var devicesByDevAddr = deviceRegistry.InternalGetCachedDevicesForDevAddr(simulatedDevice.DevAddr);
             Assert.NotEmpty(devicesByDevAddr);

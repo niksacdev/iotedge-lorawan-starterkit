@@ -29,11 +29,11 @@ namespace LoRaWan.NetworkServer
             return client;
         });
 
-        public async ValueTask<JObject> DecodeMessageAsync(byte[] payload, byte fport, string sensorDecoder)
+        public async ValueTask<DecodePayloadResult> DecodeMessageAsync(string devEUI, byte[] payload, byte fport, string sensorDecoder)
         {
             sensorDecoder = sensorDecoder ?? string.Empty;
 
-            string result;
+            DecodePayloadResult result;
             var base64Payload = Convert.ToBase64String(payload);
 
             // Call local decoder (no "http://" in SensorDecoder)
@@ -44,18 +44,21 @@ namespace LoRaWan.NetworkServer
 
                 if (toInvoke != null)
                 {
-                    result = (string)toInvoke.Invoke(null, new object[] { payload, fport });
+                    result = (DecodePayloadResult)toInvoke.Invoke(null, new object[] { devEUI, payload, fport });
                 }
                 else
                 {
-                    result = $"{{\"error\": \"No '{sensorDecoder}' decoder found\", \"rawpayload\": \"{base64Payload}\"}}";
+                    result = new DecodePayloadResult()
+                    {
+                        Error = "No '{sensorDecoder}' decoder found",
+                        RawPayload = base64Payload,
+                    };
                 }
             }
-
-            // Call SensorDecoderModule hosted in seperate container ("http://" in SensorDecoder)
-            // Format: http://containername/api/decodername
             else
             {
+                // Call SensorDecoderModule hosted in seperate container ("http://" in SensorDecoder)
+                // Format: http://containername/api/decodername
                 string toCall = sensorDecoder;
 
                 if (sensorDecoder.EndsWith("/"))
@@ -64,35 +67,22 @@ namespace LoRaWan.NetworkServer
                 }
 
                 // use HttpUtility to UrlEncode Fport and payload
-                string fportEncoded = HttpUtility.UrlEncode(fport.ToString());
-                string payloadEncoded = HttpUtility.UrlEncode(base64Payload);
+                var payloadEncoded = HttpUtility.UrlEncode(base64Payload);
+                var devEUIEncoded = HttpUtility.UrlEncode(devEUI);
 
                 // Add Fport and Payload to URL
-                toCall = $"{toCall}?fport={fportEncoded}&payload={payloadEncoded}";
+                toCall = $"{toCall}?devEUI={devEUIEncoded}&fport={fport.ToString()}&payload={payloadEncoded}";
 
                 // Call SensorDecoderModule
                 result = await this.CallSensorDecoderModule(toCall, payload);
             }
 
-            JObject resultJson;
-
-            // Verify that result is valid JSON.
-            try
-            {
-                resultJson = JObject.Parse(result);
-            }
-            catch
-            {
-                resultJson = JObject.Parse($"{{\"error\": \"Invalid JSON returned from '{sensorDecoder}'\", \"rawpayload\": \"{base64Payload}\"}}");
-            }
-
-            return resultJson;
+            return result;
         }
 
-        async Task<string> CallSensorDecoderModule(string sensorDecoderModuleUrl, byte[] payload)
+        async Task<DecodePayloadResult> CallSensorDecoderModule(string sensorDecoderModuleUrl, byte[] payload)
         {
             var base64Payload = Convert.ToBase64String(payload);
-            string result = string.Empty;
 
             try
             {
@@ -102,7 +92,7 @@ namespace LoRaWan.NetworkServer
                 {
                     var badReqResult = await response.Content.ReadAsStringAsync();
 
-                    result = JsonConvert.SerializeObject(new
+                    return new DecodePayloadResult(new
                     {
                         error = $"SensorDecoderModule '{sensorDecoderModuleUrl}' returned bad request.",
                         exceptionMessage = badReqResult ?? string.Empty,
@@ -111,38 +101,44 @@ namespace LoRaWan.NetworkServer
                 }
                 else
                 {
-                    result = await response.Content.ReadAsStringAsync();
+                    return JsonConvert.DeserializeObject<DecodePayloadResult>(await response.Content.ReadAsStringAsync());
                 }
             }
             catch (Exception ex)
             {
                 Logger.Log($"Error in decoder handling: {ex.Message}", LogLevel.Error);
 
-                result = JsonConvert.SerializeObject(new
+                return new DecodePayloadResult(new
                 {
                     error = $"Call to SensorDecoderModule '{sensorDecoderModuleUrl}' failed.",
                     exceptionMessage = ex.Message,
                     rawpayload = base64Payload
                 });
             }
-
-            return result;
         }
 
         /// <summary>
-        /// Value sensor decoding, from <see cref="byte[]"/> to <see cref="string"/>
+        /// Value sensor decoding, from <see cref="byte[]"/> to <see cref="DecodePayloadResult"/>
         /// </summary>
+        /// <param name="devEUI">Device identifier</param>
         /// <param name="payload">The payload to decode</param>
         /// <param name="fport">The received frame port</param>
         /// <returns>The decoded value as a JSON string</returns>
-        public static string DecoderValueSensor(byte[] payload, uint fport)
+        public static DecodePayloadResult DecoderValueSensor(string devEUI, byte[] payload, uint fport)
         {
             var result = Encoding.UTF8.GetString(payload);
 
-            var isSupportedNumericValue = double.TryParse(result, NumberStyles.Float, CultureInfo.InvariantCulture, out double ignored);
-            var quotes = isSupportedNumericValue ? string.Empty : "\"";
+            if (long.TryParse(result, NumberStyles.Float, CultureInfo.InvariantCulture, out var longValue))
+            {
+                return new DecodePayloadResult(longValue);
+            }
 
-            return $"{{ \"value\":{quotes}{result}{quotes} }}";
+            if (double.TryParse(result, NumberStyles.Float, CultureInfo.InvariantCulture, out var doubleValue))
+            {
+                return new DecodePayloadResult(doubleValue);
+            }
+
+            return new DecodePayloadResult(result);
         }
     }
 }

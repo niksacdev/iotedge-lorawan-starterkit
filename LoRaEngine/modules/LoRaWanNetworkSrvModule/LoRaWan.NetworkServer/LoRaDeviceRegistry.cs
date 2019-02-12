@@ -108,7 +108,8 @@ namespace LoRaWan.NetworkServer
                                 // remove from cache now
                                 cts.Cancel();
                             }
-                        });
+                        },
+                        (l) => this.UpdateDeviceRegistration(l));
 
                     return loader;
                 });
@@ -137,6 +138,70 @@ namespace LoRaWan.NetworkServer
 
             // not in cache, need to make a single search by dev addr
             return this.GetOrCreateLoadingDevicesRequestQueue(devAddr);
+        }
+
+        /// <summary>
+        /// Called to sync up list of devices kept by device registry
+        /// </summary>
+        void UpdateDeviceRegistration(LoRaDevice loRaDevice)
+        {
+            var dictionary = this.InternalGetCachedDevicesForDevAddr(loRaDevice.DevAddr);
+            dictionary.AddOrUpdate(loRaDevice.DevEUI, loRaDevice, (k, old) =>
+            {
+                // TODO: cleanup old
+                return loRaDevice;
+            });
+
+            Logger.Log(loRaDevice.DevEUI, "device added to cache", LogLevel.Debug);
+
+            this.cache.Set(this.CacheKeyForDevEUIDevice(loRaDevice.DevEUI), loRaDevice);
+        }
+
+        /// <summary>
+        /// Called to sync up list of devices kept by device registry
+        /// </summary>
+        async Task UpdateDeviceRegistrationAsync(LoRaDevice loRaDevice, string oldDevAddr = null)
+        {
+            this.UpdateDeviceRegistration(loRaDevice);
+
+            if (!string.IsNullOrEmpty(oldDevAddr) && !string.Equals(oldDevAddr, loRaDevice.DevAddr, StringComparison.InvariantCultureIgnoreCase))
+            {
+                var oldDevAddrDictionary = this.InternalGetCachedDevicesForDevAddr(oldDevAddr);
+                if (oldDevAddrDictionary.TryRemove(loRaDevice.DevEUI, out var oldDevAddrDevice))
+                {
+                    if (!object.ReferenceEquals(oldDevAddrDevice, loRaDevice))
+                    {
+                        await oldDevAddrDevice.DisconnectAsync();
+                    }
+                }
+            }
+        }
+
+        private string CacheKeyForDevEUIDevice(string devEUI) => string.Concat("deveui:", devEUI);
+
+        /// <summary>
+        /// Gets a device by DevEUI
+        /// </summary>
+        public async Task<LoRaDevice> GetDeviceByDevEUIAsync(string devEUI)
+        {
+            if (this.cache.TryGetValue<LoRaDevice>(this.CacheKeyForDevEUIDevice(devEUI), out var cachedDevice))
+                return cachedDevice;
+
+            // TODO: keep track of loading
+            var deviceInfo = await this.loRaDeviceAPIService.SearchByDevEUIAsync(devEUI);
+            var loRaDevice = this.deviceFactory.Create(deviceInfo.Devices[0]);
+            await loRaDevice.InitializeAsync();
+            if (this.initializers != null)
+            {
+                foreach (var initializers in this.initializers)
+                {
+                    initializers.Initialize(loRaDevice);
+                }
+            }
+
+            await this.UpdateDeviceRegistrationAsync(loRaDevice);
+
+            return loRaDevice;
         }
 
         /// <summary>
@@ -334,8 +399,9 @@ namespace LoRaWan.NetworkServer
         /// <summary>
         /// Updates a device after a successful login
         /// </summary>
-        public void UpdateDeviceAfterJoin(LoRaDevice loRaDevice)
+        public async Task UpdateDeviceAfterJoinAsync(LoRaDevice loRaDevice, string oldDevAddr)
         {
+            /*
             var devicesMatchingDevAddr = this.cache.GetOrCreate<DevEUIToLoRaDeviceDictionary>(loRaDevice.DevAddr, (cacheEntry) =>
             {
                 cacheEntry.SlidingExpiration = TimeSpan.FromDays(1);
@@ -345,6 +411,7 @@ namespace LoRaWan.NetworkServer
 
             // if there is an instance, overwrite it
             devicesMatchingDevAddr.AddOrUpdate(loRaDevice.DevEUI, loRaDevice, (key, existing) => loRaDevice);
+            */
 
             // don't remove from pending joins because the device can try again if there was
             // a problem in the transmission
@@ -353,6 +420,8 @@ namespace LoRaWan.NetworkServer
             // once added, call initializers
             foreach (var initializer in this.initializers)
                 initializer.Initialize(loRaDevice);
+
+            await this.UpdateDeviceRegistrationAsync(loRaDevice, oldDevAddr);
         }
 
         /// <summary>
