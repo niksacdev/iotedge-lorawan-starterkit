@@ -6,6 +6,7 @@ namespace LoRaWan.NetworkServer
     using System;
     using System.Net;
     using System.Text;
+    using System.Threading;
     using System.Threading.Tasks;
     using LoRaTools.LoRaMessage;
     using LoRaTools.LoRaPhysical;
@@ -37,7 +38,7 @@ namespace LoRaWan.NetworkServer
             this.frameCounterUpdateStrategyProvider = frameCounterUpdateStrategyProvider;
         }
 
-        public async Task<bool> SendAsync(ILoRaCloudToDeviceMessage cloudToDeviceMessage)
+        public async Task<bool> SendAsync(ILoRaCloudToDeviceMessage cloudToDeviceMessage, CancellationToken cts = default(CancellationToken))
         {
             try
             {
@@ -48,15 +49,21 @@ namespace LoRaWan.NetworkServer
                     return false;
                 }
 
+                if (cts.IsCancellationRequested)
+                {
+                    Logger.Log(cloudToDeviceMessage.DevEUI, $"[C2D] Device {cloudToDeviceMessage.DevEUI} timed out, stopping", LogLevel.Error);
+                    return false;
+                }
+
                 if (string.IsNullOrEmpty(loRaDevice.DevAddr))
                 {
                     Logger.Log(loRaDevice.DevEUI, "Device devAddr is empty, cannot send cloud to device message", LogLevel.Information);
                     return false;
                 }
 
-                if (loRaDevice.DeviceClass != LoRaDeviceClass.C)
+                if (loRaDevice.ClassType != LoRaDeviceClassType.C)
                 {
-                    Logger.Log(loRaDevice.DevEUI, $"Sending cloud to device messages expects a class C device. Class type is {loRaDevice.DeviceClass}", LogLevel.Information);
+                    Logger.Log(loRaDevice.DevEUI, $"Sending cloud to device messages expects a class C device. Class type is {loRaDevice.ClassType}", LogLevel.Information);
                     return false;
                 }
 
@@ -111,7 +118,7 @@ namespace LoRaWan.NetworkServer
                 loRaDevice.LastConfirmedC2DMessageID = cloudToDeviceMessage.MessageId ?? Constants.C2D_MSG_ID_PLACEHOLDER;
             }
 
-            var frmPayload = cloudToDeviceMessage.Body;
+            var frmPayload = cloudToDeviceMessage.GetPayload();
 
             Logger.Log(loRaDevice.DevEUI, $"Sending a downstream message with ID {ConversionHelper.ByteArrayToString(rndToken)}", LogLevel.Debug);
 

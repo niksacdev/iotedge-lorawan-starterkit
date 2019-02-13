@@ -33,8 +33,6 @@ namespace LoRaWan.NetworkServer
             }
         }
 
-        public byte[] Body => this.message.GetBytes();
-
         public bool Confirmed
         {
             get
@@ -46,6 +44,8 @@ namespace LoRaWan.NetworkServer
         public string MessageId => this.message.MessageId;
 
         public string DevEUI => this.loRaDevice.DevEUI;
+
+        public byte[] GetPayload() => this.message.GetBytes();
 
         public Task<bool> CompleteAsync() => this.loRaDevice.CompleteCloudToDeviceMessageAsync(this.message);
 

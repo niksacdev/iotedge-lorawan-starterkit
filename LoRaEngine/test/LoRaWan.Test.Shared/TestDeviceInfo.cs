@@ -48,6 +48,8 @@ namespace LoRaWan.Test.Shared
 
         public int PreferredWindow { get; set; } = 1;
 
+        public char ClassType { get; set; } = 'A';
+
         /// <summary>
         /// Gets the desired properties for the <see cref="TestDeviceInfo"/>
         /// </summary>
@@ -76,6 +78,9 @@ namespace LoRaWan.Test.Shared
                 desiredProperties[nameof(this.DevAddr)] = this.DevAddr;
 
             desiredProperties[nameof(this.PreferredWindow)] = this.PreferredWindow;
+
+            if (char.ToLower(this.ClassType) != 'a')
+                desiredProperties[nameof(this.ClassType)] = this.ClassType.ToString();
 
             return desiredProperties;
         }

@@ -1,8 +1,10 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-namespace SensorDecoderModule.Classes
+namespace LoRaWan.Test.Shared
 {
+    using Newtonsoft.Json;
+
     public class LoRaCloudToDeviceMessage
     {
         [JsonProperty("devEUI", NullValueHandling = NullValueHandling.Ignore)]

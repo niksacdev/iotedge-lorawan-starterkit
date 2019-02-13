@@ -3,10 +3,11 @@
 
 namespace LoRaWan.NetworkServer
 {
+    using System.Threading;
     using System.Threading.Tasks;
 
     public interface IClassCDeviceMessageSender
     {
-        Task<bool> SendAsync(ILoRaCloudToDeviceMessage message);
+        Task<bool> SendAsync(ILoRaCloudToDeviceMessage message, CancellationToken cts = default(CancellationToken));
     }
 }

@@ -3,6 +3,7 @@
 
 namespace LoRaWan.NetworkServer
 {
+    using System.Text;
     using System.Threading.Tasks;
     using LoRaTools;
 
@@ -12,11 +13,11 @@ namespace LoRaWan.NetworkServer
 
         byte Fport { get; }
 
-        byte[] Body { get; }
-
         bool Confirmed { get; }
 
         string MessageId { get; }
+
+        byte[] GetPayload();
 
         Task<bool> CompleteAsync();
 

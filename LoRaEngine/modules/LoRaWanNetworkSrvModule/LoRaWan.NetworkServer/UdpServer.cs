@@ -42,7 +42,7 @@ namespace LoRaWan.NetworkServer
         readonly SemaphoreSlim randomLock = new SemaphoreSlim(1);
         readonly Random random = new Random();
 
-        private MessageForClassCDevicesHandler classCMessageSender;
+        private IClassCDeviceMessageSender classCMessageSender;
         private ModuleClient ioTHubModuleClient;
         private volatile int pullAckRemoteLoRaAggregatorPort = 0;
         private volatile string pullAckRemoteLoRaAddress = null;
@@ -489,7 +489,11 @@ namespace LoRaWan.NetworkServer
             }
 
             var c2d = JsonConvert.DeserializeObject<LoRaCloudToDeviceMessage>(methodRequest.DataAsJson);
-            if (await this.classCMessageSender.SendAsync(c2d))
+            CancellationToken cts = CancellationToken.None;
+            if (methodRequest.ResponseTimeout.HasValue)
+                cts = new CancellationTokenSource(methodRequest.ResponseTimeout.Value).Token;
+
+            if (await this.classCMessageSender.SendAsync(c2d, cts))
             {
                 return new MethodResponse((int)HttpStatusCode.OK);
             }

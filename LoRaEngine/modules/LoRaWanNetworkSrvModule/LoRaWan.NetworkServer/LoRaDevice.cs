@@ -76,9 +76,9 @@ namespace LoRaWan.NetworkServer
             }
         }
 
-        public LoRaDeviceClass DeviceClass
+        public LoRaDeviceClassType ClassType
         {
-            get => this.deviceClass;
+            get => this.classType;
         }
 
         readonly object fcntLock;
@@ -89,7 +89,7 @@ namespace LoRaWan.NetworkServer
         volatile int fcntDown;
         volatile LoRaRequest runningRequest;
         private ILoRaDataRequestHandler dataRequestHandler;
-        LoRaDeviceClass deviceClass;
+        LoRaDeviceClassType classType;
 
         /// <summary>
         ///  Gets or sets a value indicating whether cloud to device messages are enabled for the device
@@ -109,7 +109,7 @@ namespace LoRaWan.NetworkServer
             this.fcntLock = new object();
             this.confirmationResubmitCount = 0;
             this.queuedRequests = new Queue<LoRaRequest>();
-            this.deviceClass = LoRaDeviceClass.A;
+            this.classType = LoRaDeviceClassType.A;
         }
 
         /// <summary>
@@ -203,11 +203,11 @@ namespace LoRaWan.NetworkServer
                         this.PreferredWindow = preferredWindowTwinValue;
                 }
 
-                if (twin.Properties.Desired.Contains(TwinProperty.DeviceClass))
+                if (twin.Properties.Desired.Contains(TwinProperty.ClassType))
                 {
-                    if (string.Equals("c", (string)twin.Properties.Desired[TwinProperty.DeviceClass], StringComparison.InvariantCultureIgnoreCase))
+                    if (string.Equals("c", (string)twin.Properties.Desired[TwinProperty.ClassType], StringComparison.InvariantCultureIgnoreCase))
                     {
-                        this.deviceClass = LoRaDeviceClass.C;
+                        this.classType = LoRaDeviceClassType.C;
                     }
                 }
 

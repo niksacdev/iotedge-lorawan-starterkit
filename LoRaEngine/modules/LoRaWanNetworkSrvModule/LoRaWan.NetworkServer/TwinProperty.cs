@@ -26,6 +26,6 @@ namespace LoRaWan.NetworkServer
         public const string NetID = "NetId"; // Must be NetId to be backward compatible
         public const string DownlinkEnabled = "Downlink";
         public const string PreferredWindow = "PreferredWindow"; // (1 or 2)
-        public const string DeviceClass = "Class";
+        public const string ClassType = "ClassType";
     }
 }

@@ -30,6 +30,8 @@ namespace LoRaWan.NetworkServer
         private readonly NetworkServerConfiguration configuration;
 
         private volatile IMemoryCache cache;
+
+        private CancellationChangeToken resetCacheChangeToken;
         private CancellationTokenSource resetCacheToken;
 
         /// <summary>
@@ -46,6 +48,7 @@ namespace LoRaWan.NetworkServer
         {
             this.configuration = configuration;
             this.resetCacheToken = new CancellationTokenSource();
+            this.resetCacheChangeToken = new CancellationChangeToken(this.resetCacheToken.Token);
             this.cache = cache;
             this.loRaDeviceAPIService = loRaDeviceAPIService;
             this.deviceFactory = deviceFactory;
@@ -69,7 +72,7 @@ namespace LoRaWan.NetworkServer
             return this.cache.GetOrCreate<DevEUIToLoRaDeviceDictionary>(devAddr, (cacheEntry) =>
             {
                 cacheEntry.SlidingExpiration = TimeSpan.FromDays(1);
-                cacheEntry.ExpirationTokens.Add(new CancellationChangeToken(this.resetCacheToken.Token));
+                cacheEntry.ExpirationTokens.Add(this.resetCacheChangeToken);
                 return new DevEUIToLoRaDeviceDictionary();
             });
         }
@@ -154,7 +157,7 @@ namespace LoRaWan.NetworkServer
 
             Logger.Log(loRaDevice.DevEUI, "device added to cache", LogLevel.Debug);
 
-            this.cache.Set(this.CacheKeyForDevEUIDevice(loRaDevice.DevEUI), loRaDevice);
+            this.cache.Set(this.CacheKeyForDevEUIDevice(loRaDevice.DevEUI), loRaDevice, this.resetCacheChangeToken);
         }
 
         /// <summary>
@@ -401,22 +404,6 @@ namespace LoRaWan.NetworkServer
         /// </summary>
         public async Task UpdateDeviceAfterJoinAsync(LoRaDevice loRaDevice, string oldDevAddr)
         {
-            /*
-            var devicesMatchingDevAddr = this.cache.GetOrCreate<DevEUIToLoRaDeviceDictionary>(loRaDevice.DevAddr, (cacheEntry) =>
-            {
-                cacheEntry.SlidingExpiration = TimeSpan.FromDays(1);
-                cacheEntry.ExpirationTokens.Add(new CancellationChangeToken(this.resetCacheToken.Token));
-                return new DevEUIToLoRaDeviceDictionary();
-            });
-
-            // if there is an instance, overwrite it
-            devicesMatchingDevAddr.AddOrUpdate(loRaDevice.DevEUI, loRaDevice, (key, existing) => loRaDevice);
-            */
-
-            // don't remove from pending joins because the device can try again if there was
-            // a problem in the transmission
-            // TryRemoveJoinDeviceLoader(loRaDevice.DevEUI);
-
             // once added, call initializers
             foreach (var initializer in this.initializers)
                 initializer.Initialize(loRaDevice);
@@ -431,6 +418,7 @@ namespace LoRaWan.NetworkServer
         {
             var oldResetCacheToken = this.resetCacheToken;
             this.resetCacheToken = new CancellationTokenSource();
+            this.resetCacheChangeToken = new CancellationChangeToken(this.resetCacheToken.Token);
 
             if (oldResetCacheToken != null && !oldResetCacheToken.IsCancellationRequested && oldResetCacheToken.Token.CanBeCanceled)
             {

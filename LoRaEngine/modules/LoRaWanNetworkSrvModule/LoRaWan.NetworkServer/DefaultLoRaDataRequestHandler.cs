@@ -425,7 +425,7 @@ namespace LoRaWan.NetworkServer
 
                 Logger.Log(loRaDevice.DevEUI, $"Sending a downstream message with ID {ConversionHelper.ByteArrayToString(rndToken)}", LogLevel.Debug);
 
-                frmPayload = cloudToDeviceMessage?.Body;
+                frmPayload = cloudToDeviceMessage.GetPayload();
 
                 Logger.Log(loRaDevice.DevEUI, $"C2D message: {Encoding.UTF8.GetString(frmPayload)}, id: {cloudToDeviceMessage.MessageId ?? "undefined"}, fport: {fport}, confirmed: {requiresDeviceAcknowlegement}, cidType: {macCommandHolder?.MacCommand?[0].Cid}", LogLevel.Information);
 

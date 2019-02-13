@@ -26,9 +26,12 @@ namespace LoRaWan.Test.Shared
 
         public EventHubDataCollector IoTHubMessages { get; private set; }
 
+        Lazy<ServiceClient> serviceClient;
+
         public IntegrationTestFixtureBase()
         {
             this.Configuration = TestConfiguration.GetConfiguration();
+            this.serviceClient = new Lazy<ServiceClient>(() => ServiceClient.CreateFromConnectionString(this.Configuration.IoTHubConnectionString));
             TestLogger.Log($"[INFO] {nameof(this.Configuration.IoTHubAssertLevel)}: {this.Configuration.IoTHubAssertLevel}");
             TestLogger.Log($"[INFO] {nameof(this.Configuration.NetworkServerModuleLogAssertLevel)}: {this.Configuration.NetworkServerModuleLogAssertLevel}");
 
@@ -69,7 +72,10 @@ namespace LoRaWan.Test.Shared
                 }
                 else
                 {
-                    d.DevAddr = LoRaTools.Utils.NetIdHelper.SetNwkIdPart(d.DevAddr, this.Configuration.NetId);
+                    if (!string.IsNullOrEmpty(d.DevAddr))
+                    {
+                        d.DevAddr = LoRaTools.Utils.NetIdHelper.SetNwkIdPart(d.DevAddr, this.Configuration.NetId);
+                    }
                 }
             }
         }
@@ -143,11 +149,26 @@ namespace LoRaWan.Test.Shared
             await this.SendCloudToDeviceMessage(deviceId, msg);
         }
 
+        ServiceClient GetServiceClient() => this.serviceClient.Value;
+
         public async Task SendCloudToDeviceMessage(string deviceId, Message message)
         {
-            ServiceClient sc = ServiceClient.CreateFromConnectionString(this.Configuration.IoTHubConnectionString);
+            await this.GetServiceClient().SendAsync(deviceId, message);
+        }
 
-            await sc.SendAsync(deviceId, message);
+        public async Task InvokeModuleDirectMethodAsync(string edgeDeviceId, string moduleId, string methodName, object body)
+        {
+            try
+            {
+                var c2d = new CloudToDeviceMethod(methodName, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+                c2d.SetPayloadJson(JsonConvert.SerializeObject(body));
+                await this.GetServiceClient().InvokeDeviceMethodAsync(edgeDeviceId, moduleId, c2d);
+            }
+            catch (Exception ex)
+            {
+                TestLogger.Log($"[ERROR] Failed to call direct method, deviceId: {edgeDeviceId}, moduleId: {moduleId}, method: {methodName}: {ex.Message}");
+                throw;
+            }
         }
 
         internal async Task<Twin> ReplaceTwinAsync(string deviceId, Twin updatedTwin, string etag)
